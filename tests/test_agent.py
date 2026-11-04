@@ -78,6 +78,15 @@ def test_rate_limit_is_retried_with_backoff(tools):
     assert sleeps == [2.0, 4.0]
 
 
+def test_overloaded_model_waits_longer(tools):
+    overloaded = errors.APIError(503, {"error": {"code": 503, "message": "high demand", "status": "UNAVAILABLE"}})
+    sleeps = []
+    agent = Agent(tools, client=FakeClient([overloaded] * 3 + [text_response("Oi!")]), model="fake",
+                  min_interval_s=0, sleep=sleeps.append)
+    assert agent.send("oi").text == "Oi!"
+    assert sleeps == [5.0, 10.0, 20.0]
+
+
 def test_daily_quota_fails_fast_and_rolls_back_history(tools):
     daily = errors.APIError(429, {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED",
                                             "message": "Quota exceeded: GenerateRequestsPerDayPerProjectPerModel-FreeTier"}})

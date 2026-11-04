@@ -48,10 +48,16 @@ class Reply:
 
 
 def _retry_delay_seconds(exc: errors.APIError, attempt: int) -> float:
-    """Use the server's RetryInfo hint when present, else exponential backoff (2, 4, 8, ...)."""
+    """Use the server's RetryInfo hint when present, else exponential backoff.
+
+    429 (per-minute limit): 2, 4, 8, ... seconds. 5xx ("model overloaded" spikes last longer):
+    5, 10, 20, 40, 60 seconds.
+    """
     match = re.search(r"retryDelay['\"]?\s*[:=]\s*['\"]?(\d+(?:\.\d+)?)s", str(exc))
     if match:
         return float(match.group(1)) + 1
+    if (exc.code or 0) >= 500:
+        return float(min(60, 5 * 2**attempt))
     return float(2 ** (attempt + 1))
 
 
