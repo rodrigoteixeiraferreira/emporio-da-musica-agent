@@ -18,10 +18,12 @@ The agent chats with customers in Brazilian Portuguese with the tone the store's
 - **out-of-scope requests** (accessories the store does not sell, unrelated topics), politely redirected;
 - anything it cannot answer, by forwarding the case to the human team with a protocol number.
 
-The core idea: **the model interprets and orchestrates; code calculates.** Every price, discount,
-installment, shipping fee, stock level, order status and deadline the agent states comes from a tested
-Python tool, never from the model. The manual demands the same (section 7.1: never give prices, stock or
-deadlines without checking the system).
+The core idea: **the model interprets and orchestrates; code calculates.** Prices, discounts,
+installments, shipping fees, stock levels, order statuses and deadlines are computed by tested Python
+tools; the model only relays them, and the prompt forbids stating a figure no tool returned. The manual
+demands the same (section 7.1: never give prices, stock or deadlines without checking the system). For
+the example conversations this is also checked mechanically: a test re-runs every recorded tool call and
+verifies that each amount in R$ the agent stated came from a tool result (see [Tests](#tests)).
 
 ## Quickstart
 
@@ -67,14 +69,16 @@ python -m emporio_agent --show-tools --today 2026-03-25T10:00
 - `--today` sets the store's "now" (`STORE_TODAY`). The order data ends in March 2026, so a date right
   after it (as above) makes order and return questions meaningful. Without it, the real current time is used.
 - `--model` overrides `GEMINI_MODEL` (default `gemini-3.6-flash`).
-- In the chat, `/reset` starts a new conversation and `/sair` quits.
+- In the chat, `/reset` starts a new conversation (history cleared; a verification lock-out is kept) and
+  `/sair` quits.
 
 Try, for example: *"Quais violões com captação vocês têm até R$ 1500?"*, *"Quanto custa o Takamine GD20 no
 PIX?"*, *"Qual o status do pedido 8? Meu e-mail é anacarol.ferreira@coldmail.com"*, *"Vocês abrem
 sábado?"*.
 
-> The free tier of `gemini-3.6-flash` allows 20 requests per day, and each message uses 1 to 3 requests.
-> For longer sessions use `--model gemini-3.5-flash-lite` (500 requests/day). Limits checked on 2026-11-04.
+> The free tier of `gemini-3.6-flash` allows 20 requests per day. A message usually takes 1 request (no
+> tool) or 2 (tools, then the answer), sometimes more when the model chains tool calls (capped at 6). For
+> longer sessions use `--model gemini-3.5-flash-lite` (500 requests/day). Limits checked on 2026-11-04.
 
 ## Architecture
 
@@ -101,7 +105,7 @@ flowchart LR
 | `src/emporio_agent/pricing.py` | Pure money rules: promotional price, PIX, installment bands, combined payment, shipping. |
 | `src/emporio_agent/rules.py` | Pure date rules: opening hours and holidays, return/exchange windows, legal warranty. |
 | `src/emporio_agent/tools.py` | The 8 tools the model can call, and their JSON schemas. |
-| `src/emporio_agent/prompts.py` | System prompt: persona, hard rules, resolved inconsistencies, reference time, full manual. |
+| `src/emporio_agent/prompts.py` | System prompt: persona, hard rules, resolved inconsistencies, reference time and open/closed status (computed by code), full manual. |
 | `src/emporio_agent/agent.py` | The explicit loop *model → tool calls → results → model*, retries, history. The only Gemini-specific module. |
 | `src/emporio_agent/cli.py` | Terminal chat (`python -m emporio_agent`). |
 | `scripts/run_examples.py` | Runs the example scenarios on the real model and writes `examples/*.md`. |
@@ -142,7 +146,9 @@ what is being evaluated. Automatic function calling in the SDK is also off for t
 `pricing.py` and `rules.py` as pure functions with tests. Tools return money already formatted
 (`R$ 2.199,00`) so the model never does arithmetic. The prompt forbids stating a figure that did not come
 from a tool in the conversation, and `quote_order` exists so that "two of these, delivered to Campo
-Grande" is also computed by code.
+Grande" is also computed by code. Even the store's open/closed status is computed by code and written into
+the prompt when a conversation starts, so that outside business hours the agent says when the team is
+back (7.1) without spending a tool call.
 
 **The manual goes whole into the system prompt, no RAG.** It has 8 pages (~4k tokens). Retrieval would
 add an embedding model, a vector store, chunking choices and a failure mode (the right paragraph not
@@ -154,8 +160,9 @@ it gets out of date. RAG is the next step if the manual grows by an order of mag
 and parameterized SQL, and loads in milliseconds at start-up. The CSVs stay the source of truth.
 
 **Order data needs verification.** Order tools require the order number *and* the e-mail or phone of
-that order's customer; a failed check returns the same message whether the order exists or not, and the
-conversation is locked after three failures. The manual does not define this; it follows from its LGPD
+that order's customer; a failed check returns the same message whether the order exists or not, and
+verification is locked for the rest of the session after three failures (`/reset` does not unlock it,
+so it cannot be used to keep guessing). The manual does not define this; it follows from its LGPD
 section.
 
 **Similar names never confirm a product.** `get_product` only returns a product when all the words the
@@ -207,22 +214,30 @@ Other assumptions:
 
 - **"Exceto abaixo de R$ 50"** (3.1) is read as: purchases under R$ 50 cannot be split. Every product
   costs more than R$ 150, so the other reading (installments of at least R$ 50) gives the same results.
-- **Installment values** are rounded half-up to the cent; installments are computed on the final price
-  (with promotion) or, in a quote, on the total including shipping.
+- **Installment values** are rounded half-up to the cent (e.g. 7x on R$ 799,90 is shown as 7x of
+  R$ 114,27); the one-cent difference is assumed to be absorbed by the first installment at checkout.
+  Installments are computed on the final price (with promotion) or, in a quote, on the total including
+  shipping.
 - **PIX** is 5% off the list price, only on items without an active promotion (6.2). In a quote, items
-  on promotion keep their promotional price and shipping is not discounted.
+  on promotion keep their promotional price, shipping is not discounted, and the 5% is applied once on
+  the sum of the eligible items (rounded once).
 - **Free shipping "above R$ 500"** is strict: an order of exactly R$ 500,00 pays R$ 35,00. It is computed
   on the products' final prices, before any PIX discount.
 - **Metropolitan region:** the manual does not list its municipalities, so the R$ 35 / free rule is
-  applied to Campo Grande only; other cities get the carriers and delivery times and a quote from the team.
+  applied to Campo Grande only (also written "Campo Grande - MS", "Campo Grande/MS", ...); other cities
+  get the carriers and delivery times and a quote from the team.
 - **Promotions** have no dates in the data; `is_active` is the only signal. If two were active for the
   same product, the larger discount would apply (they do not stack).
 - **Return windows** count calendar days and include the last day. Regret: 7 days from receipt.
   Defect: 30 days from purchase (order date). **Preference: 7 days from receipt** (the manual does not
   say from when; receipt is the customer-friendly reading and matches the regret rule).
 - **Receipt date:** for delivered orders the data only has `estimated_delivery`, taken as the receipt date.
-- **Regret right (4.1) applies to online purchases;** every order in the data has a delivery, so all are
-  treated as online.
+  Shipped orders not yet delivered get no return/defect verdict: every window except "defect" starts at
+  receipt, and a defect cannot be claimed on a product not received (if it arrives damaged, the customer
+  refuses it, per 5.2); a late shipment is forwarded to the team.
+- **Regret right (4.1) applies to online purchases.** The data has no sales-channel field; since the
+  orders carry delivery data (tracking, estimated delivery) or are awaiting shipment, all are treated as
+  online purchases.
 - **Orders not yet shipped** (pending/confirmed): the manual has no cancellation rule, so the agent
   forwards them to the team.
 - **Order status meaning:** pending = awaiting payment confirmation; confirmed = paid, being prepared.
@@ -242,35 +257,45 @@ Other assumptions:
 
 Generated by `scripts/run_examples.py` against the real model with reference time 2026-03-25 10:00
 (a Wednesday, three days after the last order). The files are not edited by hand; each header records
-model, reference date, generation time and commit, and every tool call is expandable.
+model, reference date, generation time and commit, and every tool call is expandable. Some examples were
+generated at earlier commits (see each header); `tests/test_examples_consistency.py` re-runs every
+recorded tool call against the current code and requires the same result, so the figures shown are
+still what the code returns today.
 
 | # | Conversation | What it shows | Model |
 |---|---|---|---|
 | 1 | [Catalog search with a price ceiling](examples/01-catalog-search.md) | `search_products` by category and price; 12 guitars with PIX price and max installments; the out-of-stock and discontinued matches are mentioned apart. | `gemini-3.6-flash` |
 | 2 | [Price, installments and PIX](examples/02-price-and-payment.md) | `get_product`: list price, the 10x option *and* the 12x maximum, PIX with 5% off. | `gemini-3.6-flash` |
 | 3 | [Return request](examples/03-return-request.md) — **non-trivial** | Asks for order number + e-mail, verifies them, `check_return_eligibility` for regret (window ended 24/02/2026) and then for defect (30-day window ended 05/03/2026; legal warranty valid until 18/05/2026). | `gemini-3.6-flash` |
-| 4 | [Accessories and an unrelated question](examples/04-out-of-scope.md) | Strings/amplifiers declined (instruments only), World Cup question redirected; no tool calls. | `gemini-3.6-flash` |
+| 4 | [Out of scope, then store information](examples/04-out-of-scope-and-store-info.md) | Strings/amplifiers declined (instruments only), World Cup question redirected, then address and Saturday hours answered from the manual; no tool calls. | `gemini-3-flash-preview` |
 | 5 | [Expired promotion on an out-of-stock product](examples/05-expired-promotion-out-of-stock.md) — **non-trivial** | The 40% promotion has ended: current price, out of stock, three alternatives, then a `quote_order` with free shipping in Campo Grande. | `gemini-3-flash-preview` |
 
 Example 5 was regenerated after reviewing its first version (still in the git history, commit
 `2d3939a`): it offered a R$ 4.599 guitar as an alternative to a R$ 799,90 one, because the ranking
 treated fragments of model codes ("GF-**3D**", "**D**-8") as shared words. The ranking was fixed and tested
 (commit `64eccc8`) and the example generated again. By then `gemini-3.6-flash` had used its 20 daily
-requests, so `gemini-3-flash-preview` was used.
+requests, so `gemini-3-flash-preview` was used. Example 4 was extended later with a store-information
+question, after the final review pointed out that no example showed a plain policy answer.
 
 ## Tests
 
 ```bash
-pytest                 # unit tests: data, pricing, rules, tools, agent loop (no network)
+pytest                 # 107 tests, no network: data, pricing, rules, tools, prompt, agent loop, examples
 pytest -m live         # one smoke test against the real API (needs GEMINI_API_KEY)
 ```
 
 The unit tests cover, among others: row counts and statuses; search filters (category, price ceiling,
 exclusion of discontinued/coming-soon/out-of-stock); active promotion applied and inactive ignored; PIX
-only without promotion; installment bands of 3.1 (including the R$ 80/R$ 100 boundaries); metropolitan
-shipping; order verification (right, wrong, unknown order, lock-out); ambiguous and similar names; the
-three return reasons in and out of their windows; opening hours and holidays; the agent loop with a
-scripted fake model (tool round-trip, retry on 429, daily-quota failure, iteration limit).
+only without promotion (and rounded once in quotes); installment bands of 3.1, including installments of
+exactly R$ 80,00 and R$ 100,00; metropolitan shipping, including "Campo Grande - MS"-style spellings;
+order verification (right, wrong, unknown order, lock-out); ambiguous and similar names; the three
+return reasons in and out of their windows, and shipped-but-not-received orders; opening hours and
+holidays; the agent loop with a scripted fake model (tool round-trip, retry on 429 and 503, daily-quota
+failure, iteration limit).
+
+`tests/test_examples_consistency.py` turns the examples into checks: it re-runs every tool call recorded
+in `examples/*.md` and compares the result, and it fails if the agent states an amount in R$ that no tool
+returned in that conversation (and the customer did not say).
 
 The live test uses `gemini-3.5-flash-lite` by default (`GEMINI_TEST_MODEL` to change it).
 
@@ -287,10 +312,11 @@ The live test uses `gemini-3.5-flash-lite` by default (`GEMINI_TEST_MODEL` to ch
   Good for this catalog; a real store would maintain "successor" and "similar" links per product.
 - **Simplified identity verification.** Order number + e-mail/phone is a weak factor (both appear on
   receipts and e-mails). A real channel would rely on the WhatsApp number itself or a one-time code.
-- **No automatic evaluation.** Tools are unit-tested, but the agent's answers are only checked by the
-  examples and manual runs. Next step: a set of scripted conversations with expected tool calls and
-  assertions on the answer (e.g. the exact prices appear, no price appears without a tool call), run on
-  every prompt change.
+- **Little automatic evaluation of behaviour.** Tools are unit-tested and the five recorded examples are
+  checked (tool results reproduced, no unexplained amounts), but there is no live evaluation set. Next
+  step: a few dozen scripted conversations run against the model on every prompt change, asserting the
+  expected tool calls, the absence of figures without a tool result, refusals without verification and
+  out-of-scope handling; plus a runtime guard that flags a reply containing an amount no tool returned.
 - **RAG when the manual grows.** Whole-manual-in-prompt is right at 8 pages, not at 300.
 - **Persistent history per customer**, keyed by the WhatsApp number, with a retention policy (LGPD).
 - **Shipping outside Campo Grande** is not quoted; it would need the carriers' APIs (CEP, weight,
@@ -313,8 +339,10 @@ for the Google AI Studio steps. How the work was split:
   how to resolve them, the stages, the tests each stage needs before a commit, and the points where it
   had to stop and ask me.
 - **Claude Code implemented it stage by stage.** It read the statement, the manual and the CSVs first,
-  wrote the code and the tests, and only committed and pushed with the tests green (the history shows
-  that progression). Commits it wrote carry a `Co-Authored-By: Claude` trailer.
+  then wrote each stage's code and tests and committed only with the tests green, in small commits in
+  stage order (data → rules → tools → agent → CLI → examples → docs). The work happened in a single day,
+  so several commits of one stage were made minutes or seconds apart, right after its tests passed.
+  Commits it wrote carry a `Co-Authored-By: Claude` trailer.
 - **I decided at the pause points.** I authorized the creation of the public repository and of a
   dedicated Gemini API key (created in AI Studio through the browser extension and revoked after
   delivery; it was never committed). I also set the quota strategy: develop and test on
@@ -332,4 +360,14 @@ for the Google AI Studio steps. How the work was split:
   were then generated by `scripts/run_examples.py` and never edited by hand; reviewing them exposed the
   alternatives-ranking bug described above, which was fixed in code and the example regenerated.
 - **Final review by a clean-context subagent.** A separate agent that saw only the challenge statement
-  and this repository listed unmet requirements and README claims without support in the code.
+  and this repository listed unmet requirements, README claims without support in the code, and bugs
+  it could demonstrate. Everything it found was addressed in the commits after `df503fa`:
+  - bugs: "Campo Grande - MS" was not recognized as Campo Grande for shipping; a shipped but undelivered
+    order was told its defect window had expired; quantity 0 was quoted as 1; stock was checked per line
+    instead of per product; the PIX total in quotes was off by one cent;
+  - behaviour: no example showed a plain policy answer (example 4 now does); the manual's "outside
+    business hours, tell when the team is back" rule (7.1) was only implicit (the open/closed status now
+    goes into the prompt);
+  - README: overstated claims about requests per message, about the verification lock and `/reset`,
+    about orders all having deliveries, about test coverage and about the commit history were corrected,
+    and the "numbers come from tools" claim is now backed by a test on the examples.
