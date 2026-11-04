@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "emporio-agent"
+version = "0.1.0"
+description = "Customer-service agent prototype for Empório da Música (Artefact AI Engineer case)"
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=2.0",
+    "python-dotenv>=1.0",
+    "pypdf>=5.0",
+    "tzdata",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "live: calls the real Gemini API (skipped when GEMINI_API_KEY is not set)",
+]

@@ -1,0 +1,4 @@
+* text=auto eol=lf
+# Raw inputs are kept byte-for-byte as received
+data/raw/** -text
+*.pdf binary
