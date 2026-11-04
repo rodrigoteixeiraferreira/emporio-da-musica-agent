@@ -10,7 +10,7 @@ def test_describe_tool_call_is_compact_and_keeps_accents():
 
 
 def test_cli_exits_with_message_when_key_is_missing(monkeypatch, capsys):
-    monkeypatch.setattr("emporio_agent.cli.load_dotenv", lambda: None)
+    monkeypatch.setattr("emporio_agent.cli.load_env", lambda: None)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     assert main([]) == 1
     assert "GEMINI_API_KEY" in capsys.readouterr().err

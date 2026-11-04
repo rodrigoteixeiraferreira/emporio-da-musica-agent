@@ -4,11 +4,10 @@ import os
 from datetime import datetime
 
 import pytest
-from dotenv import load_dotenv
 from google.genai import errors, types
 
 from emporio_agent.agent import FALLBACK_REPLY, Agent, DailyQuotaExceeded
-from emporio_agent.config import STORE_TZ
+from emporio_agent.config import STORE_TZ, load_env
 from emporio_agent.tools import StoreTools
 
 NOW = datetime(2026, 3, 25, 10, 0, tzinfo=STORE_TZ)
@@ -95,7 +94,7 @@ def test_reset_clears_history(tools):
     assert agent.history == []
 
 
-load_dotenv()
+load_env()
 
 
 @pytest.mark.live

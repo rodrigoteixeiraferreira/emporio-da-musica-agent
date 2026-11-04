@@ -19,6 +19,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m \"not live\""
 pythonpath = ["src"]
 markers = [
     "live: calls the real Gemini API (skipped when GEMINI_API_KEY is not set)",

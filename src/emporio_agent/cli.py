@@ -12,11 +12,10 @@ import json
 import os
 import sys
 
-from dotenv import load_dotenv
 from google.genai import errors
 
 from .agent import Agent, DailyQuotaExceeded, ToolCall
-from .config import gemini_model, store_now
+from .config import gemini_model, load_env, store_now
 from .db import StoreDB
 from .prompts import now_label
 from .tools import StoreTools
@@ -46,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--today", help="reference date/time for the store, e.g. 2026-03-25T10:00 (overrides STORE_TODAY)")
     args = parser.parse_args(argv)
 
-    load_dotenv()
+    load_env()
     if args.today:
         os.environ["STORE_TODAY"] = args.today
     if not os.getenv("GEMINI_API_KEY"):

@@ -29,6 +29,14 @@ STORE_EMAIL = "contato@emporiodamusica.com.br"
 DEFAULT_MODEL = "gemini-3.8-flash"
 
 
+def load_env() -> None:
+    """Load .env from the current directory or the project root (real env vars win)."""
+    from dotenv import find_dotenv, load_dotenv
+
+    load_dotenv(find_dotenv(usecwd=True))
+    load_dotenv(PROJECT_ROOT / ".env")
+
+
 def gemini_model() -> str:
     return os.getenv("GEMINI_MODEL", "").strip() or DEFAULT_MODEL
 
