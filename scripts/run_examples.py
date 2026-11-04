@@ -137,14 +137,14 @@ def main() -> int:
             continue
         agent = Agent(StoreTools(db), model=model, min_interval_s=args.min_interval)
         turns = []
-        print(f"[{scenario['id']}] {scenario['title']}")
+        print(f"[{scenario['id']}] {scenario['title']}", flush=True)
         for message in scenario["messages"]:
             reply = agent.send(message)
             turns.append((message, reply))
-            print(f"  cliente: {message}\n  tools: {[c.name for c in reply.tool_calls]}\n  loja: {reply.text}\n")
+            print(f"  cliente: {message}\n  tools: {[c.name for c in reply.tool_calls]}\n  loja: {reply.text}\n", flush=True)
         path = args.out_dir / f"{scenario['id']:02d}-{scenario['slug']}.md"
         path.write_text(render(scenario, model, turns, agent.total_requests), encoding="utf-8", newline="\n")
-        print(f"  -> {path} ({agent.total_requests} requests)\n")
+        print(f"  -> {path} ({agent.total_requests} requests)\n", flush=True)
     return 0
 
 
