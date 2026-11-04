@@ -3,15 +3,36 @@
 | | |
 |---|---|
 | Scenario | The customer asks for a past promotion on a product that is out of stock: the agent says the promotion has ended, that the product is unavailable, offers alternatives and quotes shipping. |
-| Model | `gemini-3.6-flash` (Gemini API, free tier) |
+| Model | `gemini-3-flash-preview` (Gemini API, free tier) |
 | Reference date (`STORE_TODAY`) | 2026-03-25T10:00 (America/Campo_Grande) |
-| Generated at | 2026-11-04T10:37:46-04:00 |
-| Commit | `49e44f5` |
+| Generated at | 2026-11-04T10:40:37-04:00 |
+| Commit | `64eccc8` |
 | Model requests | 4 |
 
 > Raw output of `scripts/run_examples.py`, not edited by hand. The conversation is in Brazilian Portuguese; tool calls are shown as with `--show-tools` (expand to see what each tool returned).
 
 **Cliente:** Vi que o violão Giannini GF-3D estava com 40% de desconto na Semana do Músico. Ainda tá valendo? Queria comprar um.
+
+<details>
+<summary>🔧 <code>get_store_status()</code></summary>
+
+```json
+{
+  "now": "quarta-feira, 25/03/2026 10:00 (horário de Campo Grande/MS)",
+  "is_open": true,
+  "today_hours": "09:00 às 18:00",
+  "holiday": null,
+  "closes_at": "18:00",
+  "next_opening": null,
+  "weekly_hours": {
+    "segunda a sexta": "09:00 às 18:00",
+    "sábado": "09:00 às 13:00",
+    "domingo e feriados": "fechado"
+  },
+  "note": "em datas especiais (Black Friday, aniversário da loja, Natal) o horário pode ser estendido"
+}
+```
+</details>
 
 <details>
 <summary>🔧 <code>get_product(product="Giannini GF-3D")</code></summary>
@@ -82,45 +103,45 @@
       "max_installments": "6x de R$ 96,65 sem juros"
     },
     {
-      "product_id": 101,
-      "name": "Giannini GNF-3 CEQ Elétrico Nylon Natural",
+      "product_id": 107,
+      "name": "Shelby SGD-195E Elétrico Aço Sunburst",
       "category": "Violões",
       "availability": "disponível",
-      "stock_quantity": 4,
-      "price": "R$ 1.049,00",
-      "pix_price": "R$ 996,55",
-      "max_installments": "10x de R$ 104,90 sem juros"
+      "stock_quantity": 6,
+      "price": "R$ 799,00",
+      "pix_price": "R$ 759,05",
+      "max_installments": "7x de R$ 114,14 sem juros"
     },
     {
-      "product_id": 97,
-      "name": "Crafter D-8 Dreadnought Natural",
+      "product_id": 91,
+      "name": "Tagima Woodstock Dreadnought Natural",
       "category": "Violões",
       "availability": "disponível",
-      "stock_quantity": 2,
-      "price": "R$ 4.599,00",
-      "pix_price": "R$ 4.369,05",
-      "max_installments": "12x de R$ 383,25 sem juros"
+      "stock_quantity": 11,
+      "price": "R$ 899,00",
+      "pix_price": "R$ 854,05",
+      "max_installments": "8x de R$ 112,38 sem juros"
     }
   ]
 }
 ```
 </details>
 
-**Loja:** Olá! A promoção da Semana do Músico já se encerrou, então o desconto não está mais ativo.   
+**Loja:** Olá! Tudo bem? A promoção da Semana do Músico já encerrou, então aquele desconto de 40% não está mais ativo.   
   
-O violão Giannini GF-3D Dreadnought Sunburst voltou ao preço normal de R$ 799,90 (ou R$ 759,91 no PIX, ou em até 7x de R$ 114,27 sem juros), mas no momento ele está esgotado no nosso estoque.  
+No momento, o violão Giannini GF-3D Dreadnought Sunburst está saindo por R$ 799,90 (ou R$ 759,91 no PIX com 5% de desconto). Além disso, ele está temporariamente esgotado em nosso estoque.  
   
-Se quiser ver outras opções disponíveis na loja, tenho estas alternativas:  
-- Giannini GF-1R Aço Folk Sunburst por R$ 579,90 (ou R$ 550,91 no PIX)  
-- Giannini GNF-3 CEQ Elétrico Nylon Natural por R$ 1.049,00 (ou R$ 996,55 no PIX)  
-- Crafter D-8 Dreadnought Natural por R$ 4.599,00 (ou R$ 4.369,05 no PIX)  
+Como você busca um modelo parecido, tenho estas opções disponíveis agora:  
+- Giannini GF-1R Aço Folk Sunburst: R$ 579,90 (ou R$ 550,91 no PIX).  
+- Shelby SGD-195E Elétrico Aço Sunburst: R$ 799,00 (ou R$ 759,05 no PIX).  
+- Tagima Woodstock Dreadnought Natural: R$ 899,00 (ou R$ 854,05 no PIX).  
   
-Posso te ajudar com mais detalhes sobre algum desses modelos ou com alguma outra dúvida?
+Algum desses te interessa ou gostaria de ver outro modelo?
 
 **Cliente:** Gostei do primeiro que você sugeriu. Moro em Campo Grande, quanto fica com a entrega?
 
 <details>
-<summary>🔧 <code>quote_order(city="Campo Grande", items=[{"quantity": 1, "product_id": 88}])</code></summary>
+<summary>🔧 <code>quote_order(items=[{"quantity": 1, "product_id": 88}], city="Campo Grande")</code></summary>
 
 ```json
 {
@@ -162,10 +183,8 @@ Posso te ajudar com mais detalhes sobre algum desses modelos ou com alguma outra
 ```
 </details>
 
-**Loja:** Ótima escolha! Para o violão Giannini GF-1R Aço Folk Sunburst, como o valor é de R$ 579,90 (acima de R$ 500,00), o frete para Campo Grande é grátis! 🚛  
+**Loja:** Como o valor do Giannini GF-1R é de R$ 579,90, a sua entrega aqui em Campo Grande sai de graça! Nossa política oferece frete grátis para pedidos acima de R$ 500,00 na cidade.  
   
-O prazo de entrega é de 1 a 3 dias úteis via motoboy próprio.   
+O total do pedido fica em R$ 579,90, e se você optar pelo PIX, tem aquele desconto de 5% e o valor cai para R$ 550,91. No cartão, você pode parcelar em até 6x de R$ 96,65 sem juros.  
   
-O valor total do pedido fica em R$ 579,90, com desconto no PIX saindo por R$ 550,91, ou parcelado no cartão em até 6x de R$ 96,65 sem juros.  
-  
-Posso te ajudar a dar andamento ou em mais alguma dúvida?
+O prazo de entrega pelo nosso motoboy é de 1 a 3 dias úteis. Gostaria de fechar o pedido ou tem mais alguma dúvida?
