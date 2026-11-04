@@ -26,7 +26,7 @@ STORE_PHONE = "(67) 3341-4444"
 STORE_WHATSAPP = "(67) 3321-4500"
 STORE_EMAIL = "contato@emporiodamusica.com.br"
 
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "gemini-3.6-flash"
 
 
 def load_env() -> None:

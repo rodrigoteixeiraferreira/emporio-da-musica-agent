@@ -43,6 +43,9 @@ pip install -r requirements.txt
 Copy-Item .env.example .env   # then open .env and paste your key after GEMINI_API_KEY=
 ```
 
+If PowerShell refuses to run `Activate.ps1`, allow it for the current window with
+`Set-ExecutionPolicy -Scope Process Bypass` and activate again.
+
 macOS / Linux:
 
 ```bash
@@ -63,14 +66,14 @@ python -m emporio_agent --show-tools --today 2026-03-25T10:00
 - `--show-tools` prints every tool call and its result.
 - `--today` sets the store's "now" (`STORE_TODAY`). The order data ends in March 2026, so a date right
   after it (as above) makes order and return questions meaningful. Without it, the real current time is used.
-- `--model` overrides `GEMINI_MODEL` (default `gemini-3.8-flash`).
+- `--model` overrides `GEMINI_MODEL` (default `gemini-3.6-flash`).
 - In the chat, `/reset` starts a new conversation and `/sair` quits.
 
 Try, for example: *"Quais violões com captação vocês têm até R$ 1500?"*, *"Quanto custa o Takamine GD20 no
 PIX?"*, *"Qual o status do pedido 8? Meu e-mail é anacarol.ferreira@coldmail.com"*, *"Vocês abrem
 sábado?"*.
 
-> The free tier of `gemini-3.8-flash` allows 20 requests per day, and each message uses 1 to 3 requests.
+> The free tier of `gemini-3.6-flash` allows 20 requests per day, and each message uses 1 to 3 requests.
 > For longer sessions use `--model gemini-3.5-flash-lite` (500 requests/day). Limits checked on 2026-11-04.
 
 ## Architecture
@@ -118,12 +121,15 @@ flowchart LR
 
 ## Technical decisions and why
 
-**Model and provider: Gemini API, free tier (`gemini-3.8-flash`).** The case allows free models, and the
+**Model and provider: Gemini API, free tier (`gemini-3.6-flash`).** The case allows free models, and the
 free tier means a reviewer can run the project without paying anything. On 2026-11-04 I checked the
-official docs and Google AI Studio: `gemini-3.8-flash` is the newest stable Flash model on the free tier
-and supports function calling (5 requests/min, 20/day). Development and the live smoke test used
-`gemini-3.5-flash-lite` (15/min, 500/day) to spare the Flash quota. The model is one environment
-variable (`GEMINI_MODEL`) away.
+official docs and Google AI Studio: the stable Flash models on the free tier (`gemini-3.8-flash`,
+`gemini-3.7-flash`, `gemini-3.6-flash`) support function calling, with 5 requests/min and 20/day each.
+I planned to use the newest, `gemini-3.8-flash`, but when generating the final examples it (and 3.7)
+answered `503 UNAVAILABLE — high demand` for several minutes, while `gemini-3.6-flash` answered normally.
+I chose a model that works reliably for a reviewer today over the newest one, and made it the default.
+Development and the live smoke test used `gemini-3.5-flash-lite` (15/min, 500/day) to spare the Flash
+quota. The model is one environment variable (`GEMINI_MODEL`) or flag (`--model`) away.
 
 **Native function calling in an explicit loop, no framework.** The task is a single agent with eight
 tools. `agent.py` is about 150 lines: send the history, run the function calls the model asks for, send
@@ -305,7 +311,7 @@ for the Google AI Studio steps. How the work was split:
 - **Iterating on behaviour with real runs.** The example scenarios were first run on Flash-Lite as a dry
   run. The issues found there became prompt fixes in a commit of their own (e.g. mention items that
   match a search but are unavailable, and say the maximum number of installments when asked about 10x).
-  The final examples were then generated with `gemini-3.8-flash` by `scripts/run_examples.py` and never
+  The final examples were then generated with `gemini-3.6-flash` by `scripts/run_examples.py` and never
   edited by hand.
 - **Final review by a clean-context subagent.** A separate agent that saw only the challenge statement
   and this repository listed unmet requirements and README claims without support in the code.

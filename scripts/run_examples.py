@@ -117,7 +117,7 @@ def main() -> int:
     force_utf8_console()
     load_env()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--model", default=None, help="Gemini model id (default: GEMINI_MODEL or gemini-3.8-flash)")
+    parser.add_argument("--model", default=None, help="Gemini model id (default: GEMINI_MODEL or gemini-3.6-flash)")
     parser.add_argument("--only", type=int, nargs="*", help="scenario ids to run")
     parser.add_argument("--out-dir", type=Path, default=PROJECT_ROOT / "examples")
     parser.add_argument("--min-interval", type=float, default=13.0,

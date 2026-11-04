@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     force_utf8_console()
     parser = argparse.ArgumentParser(prog="python -m emporio_agent", description="Chat with the Empório da Música agent.")
     parser.add_argument("--show-tools", action="store_true", help="print every tool call and its result")
-    parser.add_argument("--model", help="Gemini model id (default: GEMINI_MODEL or gemini-3.8-flash)")
+    parser.add_argument("--model", help="Gemini model id (default: GEMINI_MODEL or gemini-3.6-flash)")
     parser.add_argument("--today", help="reference date/time for the store, e.g. 2026-03-25T10:00 (overrides STORE_TODAY)")
     args = parser.parse_args(argv)
 
