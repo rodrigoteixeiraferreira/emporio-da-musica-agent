@@ -461,6 +461,7 @@ class StoreTools:
             "status": row["status"],
             "status_label": ORDER_STATUS_PT[row["status"]],
             "order_date": _fmt_date(_parse_date(row["order_date"])),
+            "order_date_note": "data da compra; a data de despacho não é registrada no sistema",
             "total": pricing.fmt_brl(row["total_brl"]),
             "payment": _payment_label(row["payment_method"]),
             "items": self._items(row["order_id"]),
