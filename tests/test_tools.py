@@ -246,3 +246,42 @@ def test_dispatch_and_declarations(tools):
     assert tools.call("get_product", {"product": "95"})["product_id"] == 95
     assert "error" in tools.call("drop_tables", {})
     assert "error" in tools.call("get_product", {"wrong": 1})
+
+
+# ------------------------------------------------------------------ fixes after the clean-context review
+
+def test_quote_rejects_zero_quantity(tools):
+    assert "error" in tools.quote_order([{"product_id": 83, "quantity": 0}], city="Campo Grande")
+
+
+def test_quote_checks_stock_per_product_across_lines(tools):
+    r = tools.quote_order([{"product_id": 93, "quantity": 2}, {"product_id": 93, "quantity": 2}], city="Campo Grande")
+    assert r["items"][0]["quantity"] == 4 and any("só há 2" in w for w in r["warnings"])
+
+
+def test_quote_pix_is_rounded_once_on_the_total(tools):
+    r = tools.quote_order([{"product_id": 83, "quantity": 2}], city="Campo Grande")
+    assert r["pix_total"] == "R$ 816,81"  # 5% off R$ 859,80, not 2 x R$ 408,41
+
+
+def test_quote_accepts_city_with_state(tools):
+    r = tools.quote_order([{"product_id": 83, "quantity": 1}], city="Campo Grande - MS")
+    assert r["shipping"]["fee"] == "R$ 35,00" and r["total"] == "R$ 464,90"
+
+
+@pytest.mark.parametrize("reason", ["arrependimento", "defeito", "preferencia"])
+def test_shipped_but_not_received_has_no_window_yet(tools, reason):
+    r = tools.check_return_eligibility(8, "anacarol.ferreira@coldmail.com", reason)
+    assert r["eligible"] is None and r["is_late"] is True and "escalate_to_human" in r["next_step"]
+
+
+def test_preference_inside_window(db, tmp_path):
+    early = StoreTools(db, now=lambda: datetime(2026, 2, 22, 10, 0, tzinfo=STORE_TZ), handoffs_file=tmp_path / "h.jsonl")
+    r = early.check_return_eligibility(7, LETICIA, "preferencia")
+    assert r["eligible"] is True and r["deadline"] == "24/02/2026" and r["days_left"] == 2
+
+
+def test_defect_inside_window(db, tmp_path):
+    early = StoreTools(db, now=lambda: datetime(2026, 3, 5, 10, 0, tzinfo=STORE_TZ), handoffs_file=tmp_path / "h.jsonl")
+    r = early.check_return_eligibility(7, LETICIA, "defeito")
+    assert r["eligible"] is True and r["deadline"] == "05/03/2026"

@@ -300,30 +300,40 @@ class StoreTools:
     def quote_order(self, items: list[dict], city: str | None = None) -> dict:
         if not items:
             return {"error": "informe ao menos um item (product_id e quantity)"}
+        quantities: dict[int, int] = {}  # same product on several lines is merged (stock is per product)
+        for item in items:
+            try:
+                pid, qty = int(item.get("product_id", 0)), int(item.get("quantity", 1))
+            except (TypeError, ValueError):
+                return {"error": "product_id e quantity devem ser números inteiros"}
+            if qty < 1:
+                return {"error": f"quantidade inválida para o produto {pid}: {qty}"}
+            quantities[pid] = quantities.get(pid, 0) + qty
+
         lines, warnings = [], []
         subtotal = Decimal("0")
-        pix_total = Decimal("0")
-        any_promo = False
-        for item in items:
-            pid = int(item.get("product_id", 0))
-            qty = int(item.get("quantity", 1) or 1)
+        promo_total = Decimal("0")       # promotional items: no PIX discount (6.2)
+        non_promo_list = Decimal("0")    # list prices of the other items, discounted once below
+        for pid, qty in quantities.items():
             row = self.db.one("SELECT * FROM products WHERE product_id = ?", (pid,))
-            if row is None or qty < 1:
-                return {"error": f"produto {pid} não encontrado ou quantidade inválida"}
+            if row is None:
+                return {"error": f"produto {pid} não encontrado"}
             availability = self._availability(row)
             if availability != "in_stock":
                 warnings.append(f"{row['name']}: {AVAILABILITY_PT[availability]}")
             elif qty > row["stock_quantity"]:
                 warnings.append(f"{row['name']}: só há {row['stock_quantity']} em estoque")
             unit, promo = self._final_price(row)
-            any_promo |= promo is not None
             line_total = unit * qty
             subtotal += line_total
-            pix_unit = pricing.pix_price(row["price_brl"], promo is not None)
-            pix_total += (pix_unit if pix_unit is not None else unit) * qty
+            if promo:
+                promo_total += line_total
+            else:
+                non_promo_list += Decimal(str(row["price_brl"])) * qty
             lines.append({"product_id": pid, "name": row["name"], "quantity": qty,
                           "unit_price": pricing.fmt_brl(unit), "line_total": pricing.fmt_brl(line_total),
                           "on_promotion": promo is not None})
+        pix_total = promo_total + (pricing.pix_price(non_promo_list, False) if non_promo_list else Decimal("0"))
 
         shipping: dict
         fee = None
@@ -400,7 +410,7 @@ class StoreTools:
         if self.verification_failures >= MAX_VERIFICATION_FAILURES:
             return None, {
                 "verified": False,
-                "error": "verificação bloqueada nesta conversa após várias tentativas sem sucesso",
+                "error": "verificação bloqueada nesta sessão após várias tentativas sem sucesso",
                 "next_step": f"encaminhar ao atendimento humano: WhatsApp {STORE_WHATSAPP} ou {STORE_EMAIL}",
             }
         try:
@@ -497,6 +507,22 @@ class StoreTools:
             }
 
         today = self.now().date()
+        if status == "shipped":
+            # Nothing was received yet: no return or exchange window applies to a product not in hand.
+            eta = _parse_date(row["estimated_delivery"])
+            late = eta is not None and today > eta
+            return base | {
+                "reason": reason,
+                "eligible": None,
+                "explanation": ("o pedido foi enviado e ainda não foi entregue; trocas, devoluções e a garantia "
+                                "legal de 90 dias contam a partir do recebimento. Se chegar com avaria, o cliente "
+                                "deve recusar o recebimento e avisar a loja."),
+                "estimated_delivery": _fmt_date(eta),
+                "is_late": late,
+                "next_step": ("entrega atrasada: encaminhar ao atendimento humano (escalate_to_human) para "
+                              "verificar com a transportadora") if late else None,
+            }
+
         received_on = _parse_date(row["estimated_delivery"]) if status == "delivered" else None
         result = rules.evaluate_return(reason, _parse_date(row["order_date"]), received_on, today)
         counted_from = "do recebimento" if result["counted_from"] == "receipt" else "da compra"
