@@ -50,12 +50,14 @@ SCENARIOS = [
         ],
     },
     {
-        "id": 4, "slug": "out-of-scope", "title": "Accessories and an unrelated question",
-        "goal": "Accessories are politely declined (the store sells instruments only) and an unrelated "
-                "question gets a short answer that steers back to the store.",
+        "id": 4, "slug": "out-of-scope-and-store-info", "title": "Out of scope, then store information",
+        "goal": "Accessories are politely declined (the store sells instruments only), an unrelated question "
+                "gets a short answer that steers back to the store, and a policy question (address, Saturday "
+                "hours) is answered from the manual.",
         "messages": [
             "Vocês vendem cordas e amplificador?",
             "Entendi. Aproveitando, quem ganhou a Copa do Mundo de 2022?",
+            "Beleza! E qual o endereço da loja? Vocês abrem no sábado?",
         ],
     },
     {
