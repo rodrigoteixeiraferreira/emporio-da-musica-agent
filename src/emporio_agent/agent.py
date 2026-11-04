@@ -94,8 +94,12 @@ class Agent:
         )
 
     def reset(self) -> None:
-        """Forget the conversation (history is kept in memory only)."""
+        """Start a new conversation: forget the history and refresh the time/status in the prompt.
+
+        The order-verification lock-out lives in StoreTools and deliberately survives a reset.
+        """
         self.history = []
+        self.config.system_instruction = build_system_prompt(self.tools.now())
 
     # ------------------------------------------------------------------ model call with retry
 

@@ -6,7 +6,7 @@ from datetime import datetime
 
 from .config import STORE_ADDRESS, STORE_EMAIL, STORE_PHONE, STORE_WHATSAPP
 from .policies import load_policies_markdown
-from .rules import WEEKDAYS_PT
+from .rules import WEEKDAYS_PT, store_status
 
 PERSONA_AND_RULES = """\
 You are the virtual assistant of Empório da Música, a musical-instrument store in Campo Grande/MS, \
@@ -21,8 +21,11 @@ a garantia" instead of "você está coberto/coberta").
 - Follow the standard flow (7.2): greet (by name if you know it) -> understand the need -> look it up \
 with the tools -> answer clearly with prices and conditions -> ask if there is anything else.
 
-# Reference time
-Now is {now_label} (Campo Grande/MS time). Use get_store_status to know if the store is open.
+# Reference time and store status (computed by code when this conversation started)
+Now is {now_label} (Campo Grande/MS time). {store_status_line}
+Use get_store_status if you need the status again later in the conversation.
+Outside business hours (7.1): in your first reply, mention briefly when the store and the human team are \
+back, then keep helping with whatever you can answer.
 
 # Hard rules
 1. Numbers come only from tools. Never state a price, discount, PIX price, installment, shipping fee, \
@@ -93,9 +96,20 @@ def now_label(now: datetime) -> str:
     return f"{WEEKDAYS_PT[now.weekday()]}, {now:%d/%m/%Y %H:%M}"
 
 
+def store_status_line(now: datetime) -> str:
+    status = store_status(now)
+    if status["is_open"]:
+        return f"The store is OPEN now (today {status['today_hours']}, closes at {status['closes_at']})."
+    nxt = status["next_opening"]
+    reason = f" ({status['holiday']})" if status["holiday"] else ""
+    return (f"The store is CLOSED now{reason}; it reopens {WEEKDAYS_PT[nxt.weekday()]}, "
+            f"{nxt:%d/%m/%Y} at {nxt:%H:%M}.")
+
+
 def build_system_prompt(now: datetime) -> str:
     rules = PERSONA_AND_RULES.format(
         now_label=now_label(now),
+        store_status_line=store_status_line(now),
         whatsapp=STORE_WHATSAPP,
         phone=STORE_PHONE,
         email=STORE_EMAIL,
