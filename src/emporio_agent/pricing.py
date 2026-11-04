@@ -6,6 +6,7 @@ computes any of these numbers; it only reads what the tools return.
 
 from __future__ import annotations
 
+import re
 from decimal import ROUND_HALF_UP, Decimal
 
 from .db import strip_accents
@@ -88,8 +89,15 @@ def combined_payment_allowed(amount) -> bool:
     return Decimal(str(amount)) > COMBINED_PAYMENT_ABOVE
 
 
+_STATE_SUFFIX = re.compile(r"[\s,/\-–—]+(ms|mato grosso do sul)\s*$")
+
+
 def is_metro_city(city: str | None) -> bool:
-    return strip_accents((city or "").strip().lower()) in METRO_CITIES
+    """'Campo Grande', 'campo grande - MS', 'Campo Grande/MS' and 'Campo Grande, Mato Grosso do Sul' all match."""
+    name = strip_accents((city or "").strip().lower())
+    name = _STATE_SUFFIX.sub("", name)
+    name = re.sub(r"[^a-z ]+", " ", name)
+    return " ".join(name.split()) in METRO_CITIES
 
 
 def metro_shipping_fee(order_value) -> Decimal:

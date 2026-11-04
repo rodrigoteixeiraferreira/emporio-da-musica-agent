@@ -60,3 +60,16 @@ def test_metro_shipping():
     assert pricing.is_metro_city(" campo grande ")
     assert not pricing.is_metro_city("Dourados")
     assert not pricing.is_metro_city(None)
+
+
+@pytest.mark.parametrize("city", ["Campo Grande - MS", "Campo Grande/MS", "campo grande, ms",
+                                  "Campo Grande MS", "Campo Grande, Mato Grosso do Sul"])
+def test_metro_city_accepts_state_suffixes(city):
+    assert pricing.is_metro_city(city)
+
+
+def test_installment_minimum_boundaries():
+    assert pricing.max_installments(480.00) == 6    # 6x = R$ 80,00 exactly
+    assert pricing.max_installments(479.99) == 5    # 6x would be R$ 79,99
+    assert pricing.max_installments(700.00) == 7    # 7x = R$ 100,00 exactly
+    assert pricing.max_installments(699.99) == 6
