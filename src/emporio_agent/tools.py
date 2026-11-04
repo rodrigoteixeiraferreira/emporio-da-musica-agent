@@ -137,8 +137,15 @@ class StoreTools:
         return self.db.query("SELECT * FROM products ORDER BY product_id")
 
     def _alternatives(self, row, limit: int = 3) -> list[dict]:
-        """Similar products that can be bought now: same category, most shared name words, closest price."""
-        own_tokens = set(tokenize(row["name"])) - {"natural"}
+        """Similar products that can be bought now: same category, most shared name words, closest price.
+
+        Only real words count (brand, body type, string type, finish): fragments of model codes such as
+        the "3" and "d" of "GF-3D" would otherwise make unrelated models look similar.
+        """
+        def words(name: str) -> set[str]:
+            return {t for t in tokenize(name) if t.isalpha() and len(t) >= 3} - {"natural"}
+
+        own_words = words(row["name"])
         own_price, _ = self._final_price(row)
         candidates = []
         for other in self.db.query(
@@ -146,7 +153,7 @@ class StoreTools:
             "AND status = 'active' AND stock_quantity > 0",
             (row["category_id"], row["product_id"]),
         ):
-            shared = len(own_tokens & set(tokenize(other["name"])))
+            shared = len(own_words & words(other["name"]))
             price, _ = self._final_price(other)
             candidates.append((-shared, abs(price - own_price), other))
         candidates.sort(key=lambda c: (c[0], c[1]))

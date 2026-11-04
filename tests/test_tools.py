@@ -103,6 +103,8 @@ def test_unavailable_product_brings_available_alternatives(tools):
     assert p["product_id"] == 96 and p["stock_quantity"] == 0
     assert len(p["alternatives"]) == 3
     assert all(a["availability"] == "disponível" and a["category"] == "Violões" for a in p["alternatives"])
+    # Same brand and finish first, then the closest prices; model-code fragments ("3", "d") do not count.
+    assert [a["product_id"] for a in p["alternatives"]] == [88, 107, 91]
     discontinued = tools.get_product("113")
     assert "descontinuado" in discontinued["availability"]
     assert {109, 110} <= ids(discontinued["alternatives"])  # other 7-string nylon guitars
