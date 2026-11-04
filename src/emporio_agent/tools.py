@@ -663,7 +663,11 @@ TOOL_DECLARATIONS: list[dict] = [
     },
     {
         "name": "list_active_promotions",
-        "description": "Lista as promoções ativas agora, com preço original, desconto e preço promocional. Use também para conferir se uma promoção que o cliente mencionou ainda vale.",
+        "description": (
+            "Lista as promoções ativas agora, com preço original, desconto e preço promocional. Para um "
+            "produto específico, use get_product: ele mostra as promoções ativas e encerradas daquele "
+            "produto, o estoque e as alternativas."
+        ),
         "parameters": {"type": "object", "properties": {"category": {"type": "string", "enum": _CATEGORY_NAMES}}},
     },
     {
